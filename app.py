@@ -236,17 +236,22 @@ with col2:
     st.markdown('<h2 class="section-title">⚙️ 發送方式</h2>', unsafe_allow_html=True)
     schedule_type = st.radio("", ["立即發送", "定時發送"])
 
-# 定時設定區塊
+# 修改定時設定區塊部分
 if schedule_type == "定時發送":
-    st.markdown('<div class="custom-container">', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        schedule_date = st.date_input("日期", min_value=get_taipei_now().date())
+        min_date = get_taipei_now().date()
+        schedule_date = st.date_input("日期", min_value=min_date)
     with col2:
         schedule_time = st.time_input("時間")
-    st.markdown('</div>', unsafe_allow_html=True)
+        frequency = st.selectbox(
+            "重複頻率",
+            ["每天", "一次性"],
+            index=1,
+            help="選擇發送頻率（注意：LINE Notify 有發送頻率限制）"
+        )
 
-# 只保留一個發送按鈕
+# 直接顯示上傳按鈕（移除空白區域）
 if st.button("上傳並發送", use_container_width=True):
     if uploaded_file is None:
         st.error("請選擇檔案")
