@@ -247,7 +247,79 @@ if schedule_type == "定時發送":
     st.markdown('</div>', unsafe_allow_html=True)
 
 # 發送按鈕
-st.button("上傳並發送", use_container_width=True)
+if st.button("上傳並發送", use_container_width=True):
+    if uploaded_file is None:
+        st.error("請選擇檔案")
+    else:
+        try:
+            # 保存上傳的文件
+            filename = secure_filename(uploaded_file.name)
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            
+            # 確保上傳目錄存在
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+            
+            # 保存文件
+            with open(filepath, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # 檢查文件否成功保存
+            if not os.path.exists(filepath):
+                raise Exception("文件保存失敗")
+            
+            if schedule_type == "立即發送":
+                # 立即發送
+                try:
+                    response = send_line_notify(filepath, message)
+                    st.success("發送成功！")
+                except Exception as e:
+                    st.error(f"發送失敗: {str(e)}")
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+            else:
+                # 定時發送
+                if not schedule_time or not schedule_date:
+                    st.error("請選擇發送時間")
+                else:
+                    # 檢查時間是否有效
+                    now = get_taipei_now()
+                    selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
+                    if selected_datetime <= now:
+                        st.error("請選擇未來的時間")
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                    else:
+                        task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        schedule_time_str = schedule_time.strftime("%H:%M")
+                        
+                        # 創建新的執行緒來運行定時任務
+                        task_thread = threading.Thread(
+                            target=run_scheduled_task,
+                            args=(filepath, message, schedule_time_str),
+                            daemon=True
+                        )
+                        task_thread.start()
+                        
+                        # 保存任務信息
+                        st.session_state.tasks[task_id] = {
+                            'filepath': filepath,
+                            'message': message,
+                            'schedule_time': schedule_time_str,
+                            'thread': task_thread
+                        }
+                        
+                        # 顯示確認訊息
+                        time_until = selected_datetime - now
+                        hours = int(time_until.total_seconds() // 3600)
+                        minutes = int((time_until.total_seconds() % 3600) // 60)
+                        
+                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送 (約 {hours} 小時 {minutes} 分鐘後)")
+        
+        except Exception as e:
+            st.error(f"處理失敗：{str(e)}")
+            if 'filepath' in locals() and os.path.exists(filepath):
+                os.remove(filepath)
 
 # 當前任務顯示
 if st.session_state.tasks:
@@ -307,7 +379,7 @@ if st.button("上傳並發送"):
             with open(filepath, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             
-            # 檢查文件���否成功保存
+            # 檢查文件否成功保存
             if not os.path.exists(filepath):
                 raise Exception("文件保存失敗")
             
