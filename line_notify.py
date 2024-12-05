@@ -1,7 +1,6 @@
 import requests
-import os
 
-LINE_NOTIFY_TOKEN = os.getenv('LINE_NOTIFY_TOKEN')
+LINE_NOTIFY_TOKEN = "Vjyk3QzUVyhhHw5AaFSm3i6EEdCfnD4k199r6B1JHD0"
 
 def send_line_notify(image_path, message=""):
     url = "https://notify-api.line.me/api/notify"
