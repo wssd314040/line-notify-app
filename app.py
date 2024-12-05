@@ -21,6 +21,34 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 if 'scheduled_tasks' not in st.session_state:
     st.session_state.scheduled_tasks = {}
 
+# 在頂部添加限制計數器
+if 'last_send_time' not in st.session_state:
+    st.session_state.last_send_time = datetime.now()
+if 'minute_count' not in st.session_state:
+    st.session_state.minute_count = 0
+
+def can_send_message():
+    """檢查是否可以發送訊息"""
+    now = datetime.now()
+    # 重置每分鐘計數器
+    if (now - st.session_state.last_send_time).seconds >= 60:
+        st.session_state.minute_count = 0
+        st.session_state.last_send_time = now
+    
+    # 檢查限制
+    if st.session_state.minute_count >= 5:
+        return False, "每分鐘最多發送5則訊息，請稍後再試"
+    
+    st.session_state.minute_count += 1
+    return True, ""
+
+# 在發送訊息前檢查
+def send_with_rate_limit(filepath, message):
+    can_send, error_msg = can_send_message()
+    if not can_send:
+        raise Exception(error_msg)
+    return send_line_notify(filepath, message)
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -59,9 +87,9 @@ if schedule_type == "定時發送":
     with col3:
         frequency = st.selectbox(
             "重複頻率",
-            ["每分鐘", "每小時", "每天", "一次性"],
-            index=3,  # 預設選擇"一次性"
-            help="選擇發送頻率"
+            ["每小時", "每天", "一次性"],  # 移除"每分鐘"選項
+            index=2,  # 預設選擇"一次性"
+            help="選擇發送頻率（注意：LINE Notify 有發送頻率限制）"
         )
 
     # 檢查選擇的時間是否已過
@@ -89,7 +117,7 @@ if st.button("上傳並發送"):
 
             if schedule_type == "立即發送":
                 # 立即發送
-                response = send_line_notify(filepath, message)
+                response = send_with_rate_limit(filepath, message)
                 st.success("發送成功！")
                 if os.path.exists(filepath):
                     os.remove(filepath)
@@ -110,7 +138,7 @@ if st.button("上傳並發送"):
 
                         def scheduled_task(task_id, filepath, message):
                             try:
-                                result = send_line_notify(filepath, message)
+                                result = send_with_rate_limit(filepath, message)
                                 if frequency == "一次性":
                                     if os.path.exists(filepath):
                                         os.remove(filepath)
@@ -118,13 +146,16 @@ if st.button("上傳並發送"):
                                     st.session_state.tasks.remove(task_id)
                             except Exception as e:
                                 st.error(f"排程任務執行失敗: {str(e)}")
+                                if "每分鐘最多發送5則訊息" in str(e):
+                                    # 如果是頻率限制，等待一分鐘後重試
+                                    time.sleep(60)
+                                    try:
+                                        result = send_with_rate_limit(filepath, message)
+                                    except Exception as retry_e:
+                                        st.error(f"重試失敗: {str(retry_e)}")
 
                         # 根據頻率設定排程
-                        if frequency == "每分鐘":
-                            schedule.every(1).minutes.do(
-                                scheduled_task, task_id, filepath, message
-                            ).tag(task_id)
-                        elif frequency == "每小時":
+                        if frequency == "每小時":
                             schedule.every(1).hours.do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
