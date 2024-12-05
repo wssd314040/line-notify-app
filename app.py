@@ -246,7 +246,7 @@ if schedule_type == "定時發送":
         schedule_time = st.time_input("時間")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# 發送按鈕
+# 只保留一個發送按鈕
 if st.button("上傳並發送", use_container_width=True):
     if uploaded_file is None:
         st.error("請選擇檔案")
@@ -263,7 +263,7 @@ if st.button("上傳並發送", use_container_width=True):
             with open(filepath, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             
-            # 檢查文件否成功保存
+            # 檢查文件是否成功保存
             if not os.path.exists(filepath):
                 raise Exception("文件保存失敗")
             
