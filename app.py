@@ -49,20 +49,30 @@ schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
 schedule_date = None
 schedule_time = None
 if schedule_type == "定時發送":
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         # 設置最小日期為今天
         min_date = datetime.now().date()
         schedule_date = st.date_input("選擇日期", min_value=min_date)
     with col2:
-        # 使用 time_input 來選擇具體時間（包含分鐘）
         schedule_time = st.time_input("選擇時間（精確到分鐘）")
-    
+    with col3:
+        frequency = st.selectbox(
+            "重複頻率",
+            ["每分鐘", "每小時", "每天", "一次性"],
+            index=3,  # 預設選擇"一次性"
+            help="選擇發送頻率"
+        )
+
     # 檢查選擇的時間是否已過
     now = datetime.now()
     selected_datetime = datetime.combine(schedule_date, schedule_time)
-    if selected_datetime <= now:
+    if selected_datetime <= now and frequency == "一次性":
         st.warning("請選擇未來的時間")
+
+# 顯示當前排程任務
+if 'tasks' not in st.session_state:
+    st.session_state.tasks = []
 
 # 發送按鈕
 if st.button("上傳並發送"):
@@ -91,42 +101,46 @@ if st.button("上傳並發送"):
                     # 檢查時間是否有效
                     now = datetime.now()
                     selected_datetime = datetime.combine(schedule_date, schedule_time)
-                    if selected_datetime <= now:
-                        st.warning("請選擇未來的時間")
+                    if selected_datetime <= now and frequency == "一次性":
+                        st.error("請選擇未來的時間")
                     else:
                         # 設定排程任務
                         task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                         schedule_time_str = schedule_time.strftime("%H:%M")
-                        
+
                         def scheduled_task(task_id, filepath, message):
                             try:
-                                # 添加調試信息
-                                st.write(f"執行排程任務: {task_id}")
-                                st.write(f"檔案路徑: {filepath}")
-                                st.write(f"訊息: {message}")
-                                
                                 result = send_line_notify(filepath, message)
-                                st.write(f"發送結果: {result}")
-                                
-                                if os.path.exists(filepath):
-                                    os.remove(filepath)
-                                    st.write("檔案已刪除")
-                                schedule.clear(task_id)
+                                if frequency == "一次性":
+                                    if os.path.exists(filepath):
+                                        os.remove(filepath)
+                                    schedule.clear(task_id)
+                                    st.session_state.tasks.remove(task_id)
                             except Exception as e:
                                 st.error(f"排程任務執行失敗: {str(e)}")
-                        
-                        # 設定排程時使用精確到分鐘的時間
-                        if schedule_date == datetime.now().date():
+
+                        # 根據頻率設定排程
+                        if frequency == "每分鐘":
+                            schedule.every(1).minutes.do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+                        elif frequency == "每小時":
+                            schedule.every(1).hours.do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+                        elif frequency == "每天":
                             schedule.every().day.at(schedule_time_str).do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
-                        else:
-                            days_delay = (schedule_date - datetime.now().date()).days
-                            schedule.every(days_delay).days.at(schedule_time_str).do(
+                        else:  # 一次性
+                            schedule.every().day.at(schedule_time_str).do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
+
+                        # 保存任務信息
+                        st.session_state.tasks.append(task_id)
                         
-                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送")
+                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 開始{frequency}發送")
                     
         except Exception as e:
             st.error(f"發送失敗：{str(e)}")
@@ -141,6 +155,12 @@ st.markdown("""
 3. 選擇發送方式（立即或定時）
 4. 如果選擇定時發送：
    - 選擇日期和時間
-   - 選擇重複頻率（一次性/每分鐘/每小時/每天）
+   - 選擇重複頻率（每分鐘/每小時/每天/一次性）
 5. 點擊「上傳並發送」按鈕
-""") 
+""")
+
+# 顯示當前排程任務
+if st.session_state.tasks:
+    st.markdown("### 當前排程任務")
+    for task_id in st.session_state.tasks:
+        st.write(f"任務ID: {task_id}") 
