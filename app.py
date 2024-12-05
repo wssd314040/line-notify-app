@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from line_notify import send_line_notify
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import schedule
 import time
@@ -45,10 +45,23 @@ message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（
 # 發送方式選擇
 schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
 
-# 如果選擇定時發送，顯示時間選擇器
+# 如果選擇定時發送，顯示日期和時間選擇器
+schedule_date = None
 schedule_time = None
 if schedule_type == "定時發送":
-    schedule_time = st.time_input("選擇發送時間")
+    col1, col2 = st.columns(2)
+    with col1:
+        # 設置最小日期為今天
+        min_date = datetime.now().date()
+        schedule_date = st.date_input("選擇日期", min_value=min_date)
+    with col2:
+        schedule_time = st.time_input("選擇時間")
+    
+    # 檢查選擇的時間是否已過
+    now = datetime.now()
+    selected_datetime = datetime.combine(schedule_date, schedule_time)
+    if selected_datetime <= now:
+        st.warning("請選擇未來的時間")
 
 # 發送按鈕
 if st.button("上傳並發送"):
@@ -71,27 +84,41 @@ if st.button("上傳並發送"):
                     os.remove(filepath)
             else:
                 # 定時發送
-                if not schedule_time:
+                if not schedule_time or not schedule_date:
                     st.error("請選擇發送時間")
                 else:
-                    # 設定排程任務
-                    task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    schedule_time_str = schedule_time.strftime("%H:%M")
-                    
-                    def scheduled_task(task_id, filepath, message):
-                        try:
-                            send_line_notify(filepath, message)
-                            if os.path.exists(filepath):
-                                os.remove(filepath)
-                            schedule.clear(task_id)
-                        except Exception as e:
-                            st.error(f"排程任務執行失敗: {str(e)}")
-                    
-                    schedule.every().day.at(schedule_time_str).do(
-                        scheduled_task, task_id, filepath, message
-                    ).tag(task_id)
-                    
-                    st.success(f"已排程在 {schedule_time_str} 發送")
+                    # 檢查時間是否有效
+                    now = datetime.now()
+                    selected_datetime = datetime.combine(schedule_date, schedule_time)
+                    if selected_datetime <= now:
+                        st.error("請選擇未來的時間")
+                    else:
+                        # 設定排程任務
+                        task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        schedule_time_str = schedule_time.strftime("%H:%M")
+                        
+                        def scheduled_task(task_id, filepath, message):
+                            try:
+                                send_line_notify(filepath, message)
+                                if os.path.exists(filepath):
+                                    os.remove(filepath)
+                                schedule.clear(task_id)
+                            except Exception as e:
+                                st.error(f"排程任務執行失敗: {str(e)}")
+                        
+                        # 根據選擇的日期設定排程
+                        if schedule_date == datetime.now().date():
+                            schedule.every().day.at(schedule_time_str).do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+                        else:
+                            # 計算延遲天數
+                            days_delay = (schedule_date - datetime.now().date()).days
+                            schedule.every(days_delay).days.at(schedule_time_str).do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+                        
+                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送")
                     
         except Exception as e:
             st.error(f"發送失敗：{str(e)}")
@@ -104,6 +131,6 @@ st.markdown("""
 1. 選擇要上傳的圖片檔案
 2. 輸入想要附加的訊息
 3. 選擇發送方式（立即或定時）
-4. 如果選擇定時發送，請選擇發送時間
+4. 如果選擇定時發送，請選擇日期和時間
 5. 點擊「上傳並發送」按鈕
 """) 
