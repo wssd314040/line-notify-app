@@ -40,7 +40,7 @@ def get_taipei_now():
     return datetime.now(taipei_tz)
 
 def can_send_message():
-    """檢查是��可以發送訊息"""
+    """檢查是可以發送訊息"""
     now = get_taipei_now()
     time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
@@ -98,42 +98,125 @@ if 'scheduler_started' not in st.session_state:
     scheduler_thread.start()
     st.session_state.scheduler_started = True
 
-# 頁面標題
-st.title('LINE Notify 圖片上傳')
+# 在文件頂部添加自定義 CSS
+st.markdown("""
+<style>
+    /* 主標題樣式 */
+    .main-title {
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        padding: 1.5rem 0;
+        margin-bottom: 2rem;
+        background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
+        border-radius: 10px;
+    }
+    
+    /* 分區塊標題樣式 */
+    .section-title {
+        color: #34495e;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin: 1.5rem 0;
+        padding-left: 1rem;
+        border-left: 5px solid #3498db;
+    }
+    
+    /* 任務卡片樣式 */
+    .task-card {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        margin: 0.5rem 0;
+    }
+    
+    /* 成功訊息樣式 */
+    .success-msg {
+        color: #2ecc71;
+        font-weight: bold;
+    }
+    
+    /* 錯誤訊息樣式 */
+    .error-msg {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    
+    /* 按鈕樣式 */
+    .stButton>button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 0.5rem 2rem;
+        font-weight: bold;
+    }
+    
+    .stButton>button:hover {
+        background-color: #2980b9;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# 檔案上傳
+# 修改頁面標題顯示
+st.markdown('<h1 class="main-title">LINE Notify 圖片上傳</h1>', unsafe_allow_html=True)
+
+# 添加分隔線
+st.markdown("---")
+
+# 文件上傳區塊
+st.markdown('<h2 class="section-title">📁 檔案上傳</h2>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("選擇圖片", type=list(ALLOWED_EXTENSIONS))
 
-# 訊息輸入
+# 訊息輸入區塊
+st.markdown('<h2 class="section-title">✍️ 訊息內容</h2>', unsafe_allow_html=True)
 message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（未輸入將使用預設訊息）")
 
-# 發送方式選擇
+# 發送設定區塊
+st.markdown('<h2 class="section-title">⚙️ 發送設定</h2>', unsafe_allow_html=True)
 schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
 
-# 如果選擇定時發送，顯示日期和時間選擇器
-schedule_date = None
-schedule_time = None
+# 定時設定區塊
 if schedule_type == "定時發送":
+    st.markdown('<div style="background-color: #f8f9fa; padding: 1rem; border-radius: 8px;">', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        # 使用台北���間
         min_date = get_taipei_now().date()
-        schedule_date = st.date_input("選擇期", min_value=min_date)
+        schedule_date = st.date_input("選擇日期", min_value=min_date)
     with col2:
-        schedule_time = st.time_input("選擇時間（精確到分鐘）")
+        schedule_time = st.time_input("選擇時間")
         frequency = st.selectbox(
             "重複頻率",
             ["每天", "一次性"],
             index=1,
             help="選擇發送頻率（注意：LINE Notify 有發送頻率限制）"
         )
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # 檢查時間
-    now = get_taipei_now()
-    selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
-    
-    if selected_datetime <= now:
-        st.warning("請選擇未來的時間")
+# 顯示當前任務
+if st.session_state.tasks:
+    st.markdown('<h2 class="section-title">📋 當前任務</h2>', unsafe_allow_html=True)
+    for task_id, task_info in st.session_state.tasks.items():
+        st.markdown(f"""
+        <div class="task-card">
+            <p><strong>任務ID:</strong> {task_id}</p>
+            <p><strong>預定時間:</strong> {task_info['schedule_time']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# 使用說明
+with st.expander("📖 使用說明"):
+    st.markdown("""
+    1. 選擇要上傳的圖片檔案
+    2. 輸入想要附加的訊息
+    3. 選擇發送方式（立即或定時）
+    4. 如果選擇定時發送：
+       - 選擇日期和時間
+       - 選擇重複頻率
+    5. 點擊「上傳並發送」按鈕
+    """)
 
 # 修改定時發送的邏輯
 def run_scheduled_task(filepath, message, schedule_time_str):
