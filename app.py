@@ -39,12 +39,30 @@ if 'minute_count' not in st.session_state:
 if 'tasks' not in st.session_state:
     st.session_state.tasks = {}
 
+# 將 run_scheduled_task 函數移到文件最前面的函數定義區
+def run_scheduled_task(filepath, message, schedule_time_str):
+    while True:
+        now = get_taipei_now()
+        current_time_str = now.strftime("%H:%M")
+        
+        if current_time_str == schedule_time_str:
+            try:
+                result = send_line_notify(filepath, message)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                st.success(f"定時發送成功！時間: {current_time_str}")
+                break
+            except Exception as e:
+                st.error(f"定時發送失敗: {str(e)}")
+                break
+        time.sleep(30)  # 每30秒檢查一次
+
 def get_taipei_now():
     """獲取台北當前時間"""
     return datetime.now(taipei_tz)
 
 def can_send_message():
-    """檢查是可以發送訊息"""
+    """檢查是否可以發送訊息"""
     now = get_taipei_now()
     time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
