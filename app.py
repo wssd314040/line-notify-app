@@ -126,8 +126,7 @@ if st.button("上傳並發送"):
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
                         
-                        freq_text = "一次" if frequency == "一次性" else frequency
-                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 開始{freq_text}發送")
+                        st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送")
                     
         except Exception as e:
             st.error(f"發送失敗：{str(e)}")
