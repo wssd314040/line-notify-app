@@ -107,32 +107,32 @@ st.markdown("""
 <style>
     /* 整體容器樣式 */
     .main {
-        max-width: 800px;
+        max-width: 1000px;  /* 增加寬度 */
         margin: 0 auto;
-        padding: 1rem;
+        padding: 2rem;      /* 增加內邊距 */
     }
     
     /* 主標題樣式 */
     .main-title {
         color: #2c3e50;
-        font-size: 1.8rem;
+        font-size: 2.2rem;  /* 增加字體大小 */
         font-weight: bold;
         text-align: center;
-        padding: 1rem 0;
-        margin-bottom: 1.5rem;
+        padding: 1.5rem 0;
+        margin-bottom: 2rem;
         background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
-        border-radius: 8px;
+        border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     /* 分區塊標題樣式 */
     .section-title {
         color: #34495e;
-        font-size: 1.2rem;
+        font-size: 1.5rem;  /* 增加字體大小 */
         font-weight: bold;
-        margin: 1rem 0;
-        padding-left: 0.8rem;
-        border-left: 4px solid #3498db;
+        margin: 1.5rem 0;
+        padding-left: 1rem;
+        border-left: 5px solid #3498db;
     }
     
     /* 任務卡片樣式 */
@@ -145,21 +145,28 @@ st.markdown("""
         font-size: 0.9rem;
     }
     
+    /* 輸入框和按鈕樣式 */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div,
+    .stButton > button {
+        font-size: 1.1rem;  /* 增加字體大小 */
+        padding: 0.5rem 1rem;
+    }
+    
     /* 按鈕樣式 */
-    .stButton>button {
+    .stButton > button {
         background-color: #3498db;
         color: white;
         border: none;
-        border-radius: 4px;
-        padding: 0.4rem 1.5rem;
+        border-radius: 5px;
+        padding: 0.8rem 2rem;
         font-weight: bold;
-        font-size: 0.9rem;
         transition: all 0.3s ease;
     }
     
-    .stButton>button:hover {
+    .stButton > button:hover {
         background-color: #2980b9;
-        transform: translateY(-1px);
+        transform: translateY(-2px);
     }
     
     /* 輸入框樣式 */
@@ -349,7 +356,7 @@ with st.expander("💡 使用說明"):
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 修改定時發送的邏輯
+# 將 run_scheduled_task 函數移到文件頂部
 def run_scheduled_task(filepath, message, schedule_time_str):
     while True:
         now = get_taipei_now()
