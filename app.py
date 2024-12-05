@@ -114,7 +114,7 @@ if schedule_type == "定時發送":
     with col1:
         # 使用台北時間
         min_date = get_taipei_now().date()
-        schedule_date = st.date_input("選擇日期", min_value=min_date)
+        schedule_date = st.date_input("選擇��期", min_value=min_date)
     with col2:
         schedule_time = st.time_input("選擇時間（精確到分鐘）")
         frequency = st.selectbox(
@@ -131,9 +131,82 @@ if schedule_type == "定時發送":
     if selected_datetime <= now:
         st.warning("請選擇未來的時間")
 
-# 顯示當前排程任務
-if 'tasks' not in st.session_state:
-    st.session_state.tasks = []
+# 修改定時發送的邏輯
+def run_scheduled_task(filepath, message, schedule_time_str):
+    while True:
+        now = get_taipei_now()
+        current_time_str = now.strftime("%H:%M")
+        
+        if current_time_str == schedule_time_str:
+            try:
+                result = send_line_notify(filepath, message)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                st.success(f"定時發送成功！時間: {current_time_str}")
+                break
+            except Exception as e:
+                st.error(f"定時發送失敗: {str(e)}")
+                break
+        time.sleep(30)  # 每30秒檢查一次
+
+# 修改定時發送部分
+if schedule_type == "定時發送":
+    if not schedule_time or not schedule_date:
+        st.error("請選擇發送時間")
+    else:
+        now = get_taipei_now()
+        selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
+        
+        if selected_datetime <= now:
+            st.error("請選擇未來的時間")
+        else:
+            task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            schedule_time_str = schedule_time.strftime("%H:%M")
+            
+            # 創建新的執行緒來運行定時任務
+            task_thread = threading.Thread(
+                target=run_scheduled_task,
+                args=(filepath, message, schedule_time_str),
+                daemon=True
+            )
+            task_thread.start()
+            
+            # 保存任務信息
+            if 'tasks' not in st.session_state:
+                st.session_state.tasks = {}
+            
+            st.session_state.tasks[task_id] = {
+                'filepath': filepath,
+                'message': message,
+                'schedule_time': schedule_time_str,
+                'thread': task_thread
+            }
+            
+            # 顯示確認訊息
+            time_until = selected_datetime - now
+            hours = int(time_until.total_seconds() // 3600)
+            minutes = int((time_until.total_seconds() % 3600) // 60)
+            
+            st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送 (約 {hours} 小時 {minutes} 分鐘後)")
+
+# 顯示當前任務
+if 'tasks' in st.session_state and st.session_state.tasks:
+    st.markdown("### 當前排程任務")
+    for task_id, task_info in st.session_state.tasks.items():
+        st.write(f"任務ID: {task_id}")
+        st.write(f"預定時間: {task_info['schedule_time']}")
+
+# 顯示說明
+st.markdown("""
+### 使用說明
+1. 選擇要上傳的圖片檔案
+2. 輸入想要附加的訊息
+3. 選擇發送方式（立即或定時）
+4. 如果選擇定時發送：
+   - 選擇日期和時間
+   - 選擇重複頻率（每分鐘/每小時/每天/一次性）
+5. 點擊「上傳並發送」按鈕
+""")
 
 # 發送按鈕
 if st.button("上傳並發送"):
@@ -211,20 +284,9 @@ if st.button("上傳並發送"):
             if 'filepath' in locals() and os.path.exists(filepath):
                 os.remove(filepath)
 
-# 顯示說明
-st.markdown("""
-### 使用說明
-1. 選擇要上傳的圖片檔案
-2. 輸入想要附加的訊息
-3. 選擇發送方式（立即或定時）
-4. 如果選擇定時發送：
-   - 選擇日期和時間
-   - 選擇重複頻率（每分鐘/每小時/每天/一次性）
-5. 點擊「上傳並發送」按鈕
-""")
-
-# 顯示當前排程任務
-if st.session_state.tasks:
-    st.markdown("### 當前排程任務")
-    for task_id in st.session_state.tasks:
-        st.write(f"任務ID: {task_id}") 
+# 顯示當前任務
+if 'tasks' in st.session_state and st.session_state.tasks:
+    st.markdown("### 當前任務")
+    for task_id, task_info in st.session_state.tasks.items():
+        st.write(f"任務ID: {task_id}")
+        st.write(f"預定時間: {task_info['schedule_time']}") 
