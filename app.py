@@ -27,25 +27,26 @@ if 'scheduled_tasks' not in st.session_state:
 
 # 在頂部添加限制計數器
 if 'last_send_time' not in st.session_state:
-    st.session_state.last_send_time = datetime.now()
+    st.session_state.last_send_time = datetime.now(taipei_tz)
 if 'minute_count' not in st.session_state:
     st.session_state.minute_count = 0
 
+def get_taipei_now():
+    """獲取台北當前時間"""
+    return datetime.now(taipei_tz)
+
 def can_send_message():
     """檢查是否可以發送訊息"""
-    now = datetime.now()
-    # 檢查距離上次發送是否已經過了至少15秒
+    now = get_taipei_now()
     time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
-    if time_since_last_send < 15:  # 至少等待15秒
-        return False, f"請 {15 - int(time_since_last_send)} 秒後再試"
+    if time_since_last_send < 15:
+        return False, f"請等待 {15 - int(time_since_last_send)} 秒後再試"
     
-    # 重置每分鐘計數器
     if time_since_last_send >= 60:
         st.session_state.minute_count = 0
     
-    # 檢查每分鐘限制
-    if st.session_state.minute_count >= 3:  # 降低到每分鐘最多3則
+    if st.session_state.minute_count >= 3:
         return False, "每分鐘最多發送3則訊息，請稍後再試"
     
     st.session_state.minute_count += 1
@@ -78,7 +79,7 @@ st.title('LINE Notify 圖片上傳')
 uploaded_file = st.file_uploader("選擇圖片", type=list(ALLOWED_EXTENSIONS))
 
 # 訊息輸入
-message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（���未輸入將使用預設訊息）")
+message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（未輸入將使用預設訊息）")
 
 # 發送方式選擇
 schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
@@ -89,20 +90,20 @@ schedule_time = None
 if schedule_type == "定時發送":
     col1, col2 = st.columns(2)
     with col1:
-        # 設置最小日期為今天（台北時間）
-        min_date = taipei_tz.localize(datetime.now()).date()
+        # 使用台北時間
+        min_date = get_taipei_now().date()
         schedule_date = st.date_input("選擇日期", min_value=min_date)
     with col2:
         schedule_time = st.time_input("選擇時間（精確到分鐘）")
         frequency = st.selectbox(
             "重複頻率",
-            ["每天", "一次性"],  # 只保留每天和一次性選項
-            index=1,  # 預設選擇"一次性"
+            ["每天", "一次性"],
+            index=1,
             help="選擇發送頻率（注意：LINE Notify 有發送頻率限制）"
         )
 
-    # 檢查選擇的時間是否已過
-    now = taipei_tz.localize(datetime.now())
+    # 檢查時間
+    now = get_taipei_now()
     selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
     
     if selected_datetime <= now:
@@ -149,7 +150,7 @@ if st.button("上傳並發送"):
                     st.error("請選擇發送時間")
                 else:
                     # 檢查時間是否有效
-                    now = taipei_tz.localize(datetime.now())
+                    now = get_taipei_now()
                     selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
                     if selected_datetime <= now:
                         st.error("請選擇未來的時間")
@@ -160,8 +161,7 @@ if st.button("上傳並發送"):
 
                         def scheduled_task(task_id, filepath, message):
                             try:
-                                # 使用台北時間檢查
-                                current_time = taipei_tz.localize(datetime.now())
+                                current_time = get_taipei_now()
                                 task_time = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
                                 
                                 if current_time < task_time:
