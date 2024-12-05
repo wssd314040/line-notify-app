@@ -34,7 +34,7 @@ def can_send_message():
     time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
     if time_since_last_send < 15:  # 至少等待15秒
-        return False, f"請��待 {15 - int(time_since_last_send)} 秒後再試"
+        return False, f"請�� {15 - int(time_since_last_send)} 秒後再試"
     
     # 重置每分鐘計數器
     if time_since_last_send >= 60:
@@ -129,30 +129,79 @@ if st.button("上傳並發送"):
             if not os.path.exists(filepath):
                 raise Exception("文件保存失敗")
             
-            # 添加調試信息
-            st.write(f"文件已保存到: {filepath}")
-            st.write(f"文件大小: {os.path.getsize(filepath)} bytes")
-            
-            # 發送
-            try:
-                response = send_line_notify(filepath, message)
-                st.success("發送成功！")
-                st.write(f"API 回應: {response}")
-            except Exception as e:
-                st.error(f"發送失敗: {str(e)}")
-                st.write("嘗試重新發送...")
-                time.sleep(5)  # 等待5秒
+            if schedule_type == "立即發送":
+                # 立即發送
                 try:
                     response = send_line_notify(filepath, message)
-                    st.success("重試發送成功！")
-                except Exception as retry_e:
-                    st.error(f"重試也失敗了: {str(retry_e)}")
-            
-            # 清理文件
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                st.write("文件已清理")
-            
+                    st.success("發送成功！")
+                except Exception as e:
+                    st.error(f"發送失敗: {str(e)}")
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+            else:
+                # 定時發送
+                if not schedule_time or not schedule_date:
+                    st.error("請選擇發送時間")
+                else:
+                    # 檢查時間是否有效
+                    now = datetime.now()
+                    selected_datetime = datetime.combine(schedule_date, schedule_time)
+                    if selected_datetime <= now and frequency == "一次性":
+                        st.error("請選擇未來的時間")
+                    else:
+                        # 設定排程任務
+                        task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        schedule_time_str = schedule_time.strftime("%H:%M")
+
+                        def scheduled_task(task_id, filepath, message):
+                            try:
+                                # 只在指定時間發送
+                                current_time = datetime.now()
+                                task_time = datetime.combine(schedule_date, schedule_time)
+                                
+                                # 如果還沒到時間，不執行發送
+                                if current_time < task_time:
+                                    return
+                                
+                                result = send_line_notify(filepath, message)
+                                if frequency == "一次性":
+                                    if os.path.exists(filepath):
+                                        os.remove(filepath)
+                                    schedule.clear(task_id)
+                                    if task_id in st.session_state.tasks:
+                                        st.session_state.tasks.remove(task_id)
+                            except Exception as e:
+                                st.error(f"排程任務執行失敗: {str(e)}")
+                                if frequency == "一次性":
+                                    if os.path.exists(filepath):
+                                        os.remove(filepath)
+                                    schedule.clear(task_id)
+
+                        # 設定排程
+                        if frequency == "每天":
+                            schedule.every().day.at(schedule_time_str).do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+                        else:  # 一次性
+                            # 計定在指定時間執行
+                            schedule.every().day.at(schedule_time_str).do(
+                                scheduled_task, task_id, filepath, message
+                            ).tag(task_id)
+
+                        # 保存任務信息
+                        st.session_state.tasks.append(task_id)
+                        
+                        # 顯示排程確認訊息
+                        time_until = selected_datetime - now
+                        hours = int(time_until.total_seconds() // 3600)
+                        minutes = int((time_until.total_seconds() % 3600) // 60)
+                        
+                        if frequency == "每天":
+                            st.success(f"已排程在每天 {schedule_time_str} 發送")
+                        else:
+                            st.success(f"已排程在 {schedule_date.strftime('%Y-%m-%d')} {schedule_time_str} 發送 (約 {hours} 小時 {minutes} 分鐘後)")
+
         except Exception as e:
             st.error(f"處理失敗：{str(e)}")
             if 'filepath' in locals() and os.path.exists(filepath):
