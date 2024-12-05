@@ -6,6 +6,10 @@ from werkzeug.utils import secure_filename
 import schedule
 import time
 import threading
+import pytz
+
+# 設置台北時區
+taipei_tz = pytz.timezone('Asia/Taipei')
 
 # 設置頁面配置
 st.set_page_config(page_title="LINE Notify 圖片上傳", layout="centered")
@@ -34,7 +38,7 @@ def can_send_message():
     time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
     if time_since_last_send < 15:  # 至少等待15秒
-        return False, f"請�� {15 - int(time_since_last_send)} 秒後再試"
+        return False, f"請 {15 - int(time_since_last_send)} 秒後再試"
     
     # 重置每分鐘計數器
     if time_since_last_send >= 60:
@@ -83,10 +87,10 @@ schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
 schedule_date = None
 schedule_time = None
 if schedule_type == "定時發送":
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        # 設置最小日期為今天
-        min_date = datetime.now().date()
+        # 設置最小日期為今天（台北時間）
+        min_date = taipei_tz.localize(datetime.now()).date()
         schedule_date = st.date_input("選擇日期", min_value=min_date)
     with col2:
         schedule_time = st.time_input("選擇時間（精確到分鐘）")
@@ -99,9 +103,10 @@ if schedule_type == "定時發送":
         )
 
     # 檢查選擇的時間是否已過
-    now = datetime.now()
-    selected_datetime = datetime.combine(schedule_date, schedule_time)
-    if selected_datetime <= now and frequency == "一次性":
+    now = taipei_tz.localize(datetime.now())
+    selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
+    
+    if selected_datetime <= now:
         st.warning("請選擇未來的時間")
 
 # 顯示當前排程任務
@@ -145,9 +150,9 @@ if st.button("上傳並發送"):
                     st.error("請選擇發送時間")
                 else:
                     # 檢查時間是否有效
-                    now = datetime.now()
-                    selected_datetime = datetime.combine(schedule_date, schedule_time)
-                    if selected_datetime <= now and frequency == "一次性":
+                    now = taipei_tz.localize(datetime.now())
+                    selected_datetime = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
+                    if selected_datetime <= now:
                         st.error("請選擇未來的時間")
                     else:
                         # 設定排程任務
@@ -156,11 +161,10 @@ if st.button("上傳並發送"):
 
                         def scheduled_task(task_id, filepath, message):
                             try:
-                                # 只在指定時間發送
-                                current_time = datetime.now()
-                                task_time = datetime.combine(schedule_date, schedule_time)
+                                # 使用台北時間檢查
+                                current_time = taipei_tz.localize(datetime.now())
+                                task_time = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
                                 
-                                # 如果還沒到時間，不執行發送
                                 if current_time < task_time:
                                     return
                                 
@@ -212,7 +216,7 @@ st.markdown("""
 ### 使用說明
 1. 選擇要上傳的圖片檔案
 2. 輸入想要附加的訊息
-3. 選擇發送方式（立即或定時）
+3. 選擇發送方式（立即或��時）
 4. 如果選擇定時發送：
    - 選擇日期和時間
    - 選擇重複頻率（每分鐘/每小時/每天/一次性）

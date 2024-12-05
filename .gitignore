@@ -3,4 +3,6 @@ __pycache__/
 uploads/
 screenshots/
 *.log
-.venv/ 
+.venv/
+static/
+templates/ 

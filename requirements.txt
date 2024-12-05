@@ -1,4 +1,5 @@
 streamlit
-schedule
-werkzeug
+python-dotenv
 requests
+werkzeug
+pytz
