@@ -1,7 +1,7 @@
 import requests
 import os
 
-LINE_NOTIFY_TOKEN = "Vjyk3QzUVyhhHw5AaFSm3i6EEdCfnD4k199r6B1JHD0"
+LINE_NOTIFY_TOKEN = "sr698Lzs4exMQYKNEzqVtj77mZ2Qwf2r9VUxl8JNLgx"
 
 def send_line_notify(image_path, message=""):
     url = "https://notify-api.line.me/api/notify"
