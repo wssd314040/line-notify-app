@@ -30,16 +30,22 @@ if 'minute_count' not in st.session_state:
 def can_send_message():
     """檢查是否可以發送訊息"""
     now = datetime.now()
-    # 重置每分鐘計數器
-    if (now - st.session_state.last_send_time).seconds >= 60:
-        st.session_state.minute_count = 0
-        st.session_state.last_send_time = now
+    # 檢查距離上次發送是否已經過了至少15秒
+    time_since_last_send = (now - st.session_state.last_send_time).total_seconds()
     
-    # 檢查限制
-    if st.session_state.minute_count >= 5:
-        return False, "每分鐘最多發送5則訊息，請稍後再試"
+    if time_since_last_send < 15:  # 至少等待15秒
+        return False, f"請等待 {15 - int(time_since_last_send)} 秒後再試"
+    
+    # 重置每分鐘計數器
+    if time_since_last_send >= 60:
+        st.session_state.minute_count = 0
+    
+    # 檢查每分鐘限制
+    if st.session_state.minute_count >= 3:  # 降低到每分鐘最多3則
+        return False, "每分鐘最多發送3則訊息，請稍後再試"
     
     st.session_state.minute_count += 1
+    st.session_state.last_send_time = now
     return True, ""
 
 # 在發送訊息前檢查
@@ -87,8 +93,8 @@ if schedule_type == "定時發送":
     with col3:
         frequency = st.selectbox(
             "重複頻率",
-            ["每小時", "每天", "一次性"],  # 移除"每分鐘"選項
-            index=2,  # 預設選擇"一次性"
+            ["每天", "一次性"],  # 只保留每天和一次性選項
+            index=1,  # 預設選擇"一次性"
             help="選擇發送頻率（注意：LINE Notify 有發送頻率限制）"
         )
 
@@ -138,28 +144,29 @@ if st.button("上傳並發送"):
 
                         def scheduled_task(task_id, filepath, message):
                             try:
-                                result = send_with_rate_limit(filepath, message)
+                                # 檢查是否可以發送
+                                can_send, error_msg = can_send_message()
+                                if not can_send:
+                                    # 如果不能發送，等待後重試
+                                    time.sleep(15)  # 等待15秒
+                                    can_send, error_msg = can_send_message()
+                                    if not can_send:
+                                        raise Exception(error_msg)
+                                
+                                result = send_line_notify(filepath, message)
+                                
                                 if frequency == "一次性":
                                     if os.path.exists(filepath):
                                         os.remove(filepath)
                                     schedule.clear(task_id)
                                     st.session_state.tasks.remove(task_id)
+                                
                             except Exception as e:
                                 st.error(f"排程任務執行失敗: {str(e)}")
-                                if "每分鐘最多發送5則訊息" in str(e):
-                                    # 如果是頻率限制，等待一分鐘後重試
-                                    time.sleep(60)
-                                    try:
-                                        result = send_with_rate_limit(filepath, message)
-                                    except Exception as retry_e:
-                                        st.error(f"重試失敗: {str(retry_e)}")
+                                # 如果是頻率限制錯誤，不要立即重試，等待下一次排程
 
                         # 根據頻率設定排程
-                        if frequency == "每小時":
-                            schedule.every(1).hours.do(
-                                scheduled_task, task_id, filepath, message
-                            ).tag(task_id)
-                        elif frequency == "每天":
+                        if frequency == "每天":
                             schedule.every().day.at(schedule_time_str).do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
