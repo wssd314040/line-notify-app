@@ -78,7 +78,7 @@ st.title('LINE Notify 圖片上傳')
 uploaded_file = st.file_uploader("選擇圖片", type=list(ALLOWED_EXTENSIONS))
 
 # 訊息輸入
-message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（若未輸入將使用預設訊息）")
+message = st.text_input("訊息", value="圖片上傳", help="請輸入訊息（���未輸入將使用預設訊息）")
 
 # 發送方式選擇
 schedule_type = st.radio("發送方式", ["立即發送", "定時發送"])
@@ -94,7 +94,6 @@ if schedule_type == "定時發送":
         schedule_date = st.date_input("選擇日期", min_value=min_date)
     with col2:
         schedule_time = st.time_input("選擇時間（精確到分鐘）")
-    with col3:
         frequency = st.selectbox(
             "重複頻率",
             ["每天", "一次性"],  # 只保留每天和一次性選項
@@ -216,7 +215,7 @@ st.markdown("""
 ### 使用說明
 1. 選擇要上傳的圖片檔案
 2. 輸入想要附加的訊息
-3. 選擇發送方式（立即或��時）
+3. 選擇發送方式（立即或定時）
 4. 如果選擇定時發送：
    - 選擇日期和時間
    - 選擇重複頻率（每分鐘/每小時/每天/一次性）
