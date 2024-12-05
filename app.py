@@ -63,14 +63,36 @@ def send_with_rate_limit(filepath, message):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def scheduled_task(task_id, filepath, message):
+    try:
+        current_time = get_taipei_now()
+        task_time = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
+        
+        # 移除時間檢查，讓 schedule 自己處理時間
+        result = send_line_notify(filepath, message)
+        if frequency == "一次性":
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            schedule.clear(task_id)
+            if task_id in st.session_state.tasks:
+                st.session_state.tasks.remove(task_id)
+    except Exception as e:
+        st.error(f"排程任務執行失敗: {str(e)}")
+        if frequency == "一次性":
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            schedule.clear(task_id)
+
 def schedule_sender():
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        time.sleep(1)  # 每秒檢查一次
 
-# 啟動排程執行緒
-scheduler_thread = threading.Thread(target=schedule_sender, daemon=True)
-scheduler_thread.start()
+# 啟動排程執行緒（如果還沒啟動）
+if 'scheduler_started' not in st.session_state:
+    scheduler_thread = threading.Thread(target=schedule_sender, daemon=True)
+    scheduler_thread.start()
+    st.session_state.scheduler_started = True
 
 # 頁面標題
 st.title('LINE Notify 圖片上傳')
@@ -159,36 +181,15 @@ if st.button("上傳並發送"):
                         task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                         schedule_time_str = schedule_time.strftime("%H:%M")
 
-                        def scheduled_task(task_id, filepath, message):
-                            try:
-                                current_time = get_taipei_now()
-                                task_time = taipei_tz.localize(datetime.combine(schedule_date, schedule_time))
-                                
-                                if current_time < task_time:
-                                    return
-                                
-                                result = send_line_notify(filepath, message)
-                                if frequency == "一次性":
-                                    if os.path.exists(filepath):
-                                        os.remove(filepath)
-                                    schedule.clear(task_id)
-                                    if task_id in st.session_state.tasks:
-                                        st.session_state.tasks.remove(task_id)
-                            except Exception as e:
-                                st.error(f"排程任務執行失敗: {str(e)}")
-                                if frequency == "一次性":
-                                    if os.path.exists(filepath):
-                                        os.remove(filepath)
-                                    schedule.clear(task_id)
-
-                        # 設定排程
+                        # 修改排程設置部分
                         if frequency == "每天":
-                            schedule.every().day.at(schedule_time_str).do(
+                            job = schedule.every().day.at(schedule_time_str).do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
                         else:  # 一次性
-                            # 計定在指定時間執行
-                            schedule.every().day.at(schedule_time_str).do(
+                            # 使用 schedule 的時間字符串格式
+                            schedule_time_str = schedule_time.strftime("%H:%M")
+                            job = schedule.every().day.at(schedule_time_str).do(
                                 scheduled_task, task_id, filepath, message
                             ).tag(task_id)
 
