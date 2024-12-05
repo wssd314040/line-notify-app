@@ -2,7 +2,6 @@ import streamlit as st
 import os
 from line_notify import send_line_notify
 from datetime import datetime
-from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 load_dotenv()  # 載入 .env 檔案
@@ -19,6 +18,10 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def secure_filename(filename):
+    # 簡單的文件名安全處理
+    return ''.join(c for c in filename if c.isalnum() or c in '._-')
 
 # 頁面標題
 st.title('LINE Notify 圖片上傳')
