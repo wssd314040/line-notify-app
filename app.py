@@ -31,6 +31,10 @@ if 'last_send_time' not in st.session_state:
 if 'minute_count' not in st.session_state:
     st.session_state.minute_count = 0
 
+# 初始化 session_state
+if 'tasks' not in st.session_state:
+    st.session_state.tasks = {}
+
 def get_taipei_now():
     """獲取台北當前時間"""
     return datetime.now(taipei_tz)
@@ -174,6 +178,8 @@ if schedule_type == "定時發送":
                 
                 if selected_datetime <= now:
                     st.error("請選擇未來的時間")
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
                 else:
                     task_id = f"{filename}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                     schedule_time_str = schedule_time.strftime("%H:%M")
@@ -187,9 +193,6 @@ if schedule_type == "定時發送":
                     task_thread.start()
                     
                     # 保存任務信息
-                    if 'tasks' not in st.session_state:
-                        st.session_state.tasks = {}
-                    
                     st.session_state.tasks[task_id] = {
                         'filepath': filepath,
                         'message': message,
@@ -210,7 +213,7 @@ if schedule_type == "定時發送":
                     os.remove(filepath)
 
 # 顯示當前任務
-if 'tasks' in st.session_state and st.session_state.tasks:
+if st.session_state.tasks:
     st.markdown("### 當前任務")
     for task_id, task_info in st.session_state.tasks.items():
         st.write(f"任務ID: {task_id}")
